@@ -1,5 +1,8 @@
 # Makefile
 # Author: bajackson1@quinnipiac.edu
 
-CC = gcc
-CFLAGS = -Wall
+assign1 : assign1.c
+	gcc -Wall -o assign1 assign1.c
+
+clean:
+	rm -f assign1
