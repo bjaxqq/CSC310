@@ -47,7 +47,9 @@ void delete_process(int pid, pcb *processes) {
 
 int main() {
     int max_processes;
-    scanf("%d", &max_processes);
+    if (scanf("%d", &max_processes) != 1 || max_processes <= 0) {
+        return 1; // Exit if input is invalid
+    }
 
     // Allocate main array for PCBs
     pcb *processes = (pcb *)malloc(max_processes * sizeof(pcb));
@@ -73,7 +75,7 @@ int main() {
 
         if (command == 'c') {
             // Create if space and the parent exist
-            if (next_pid < max_processes && processes[target_id].pid != -1) {
+            if (next_pid < max_processes && target_id >= 0 && target_id < max_processes && processes[target_id].pid != -1) {
                 // Set up new process PCB at designated index
                 processes[next_pid].pid = next_pid;
                 processes[next_pid].ppid = target_id;
@@ -81,16 +83,22 @@ int main() {
 
                 // Create node to add to parent children list
                 pid_node *child_node = (pid_node *)malloc(sizeof(pid_node));
-                child_node -> pid = next_pid;
+                if (child_node == NULL) { // Check if malloc succeeded
+                    free(processes);
+                    return 1;
+                }
+                child_node->pid = next_pid;
                 
                 // Add new child to front of parent list
-                child_node -> next = processes[target_id].children;
+                child_node->next = processes[target_id].children;
                 processes[target_id].children = child_node;
 
                 next_pid++; // Increment for next creation
             }
         } else if (command == 'd') {
-            delete_process(target_id, processes);
+            if (target_id >= 0 && target_id < max_processes) {
+                 delete_process(target_id, processes);
+            }
         }
     }
 
