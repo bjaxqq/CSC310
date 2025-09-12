@@ -1,3 +1,6 @@
+// assign.c
+// Author: bajackson1@quinnipiac.edu
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -24,7 +27,7 @@ void free_child_list(pid_node *head) {
 }
 
 /**
- * Recursively deletes process and descendants.
+ * Recursively deletes process and descendants
  */
 void delete_process(int pid, pcb *processes) {
     // If process gone do nothing
