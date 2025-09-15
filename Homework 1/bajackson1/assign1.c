@@ -39,7 +39,7 @@ void delete_process(int pid, pcb *processes) {
     pid_node *child = processes[pid].children;
     while (child != NULL) {
         delete_process(child->pid, processes);
-        child = child->next;
+        child = child -> next;
     }
 
     // After descendants are gone free process children list
@@ -90,10 +90,10 @@ int main() {
                     free(processes);
                     return 1;
                 }
-                child_node->pid = next_pid;
+                child_node -> pid = next_pid;
                 
                 // Add new child to front of parent list
-                child_node->next = processes[target_id].children;
+                child_node -> next = processes[target_id].children;
                 processes[target_id].children = child_node;
 
                 next_pid++; // Increment for next creation
