@@ -1,145 +1,144 @@
-// assign.c
-// Author: bajackson1@quinnipiac.edu
-
 #include <stdio.h>
 #include <stdlib.h>
 
+// A node to list a process's kids
 typedef struct pid_node {
-    int pid;
-    struct pid_node *next;
+    int pid;               // a kid's ID
+    struct pid_node *next; // next kid in the list
 } pid_node;
 
+// The "Process Control Block" (PCB)
+// Holds all the info for one process
 typedef struct pcb {
     int pid;
     int ppid;
-    struct pid_node *children;
+    struct pid_node *children; // list of my kids
 } pcb;
 
-// Free the child list
+// helper to free list of children
 void free_child_list(pid_node *head) {
+    // loop through and free each node
     while (head != NULL) {
-        pid_node *temp = head;
-        head = head->next;
-        free(temp);
+        pid_node *temp = head; // save current
+        head = head->next; // move to next
+        free(temp); // free saved one
     }
 }
 
-// Recursively delete a process and its kids
+// deletes process and kids
 void delete_process(int pid, pcb *processes) {
-    // If process gone do nothing
+    // if its gone do nothing
     if (processes[pid].pid == -1) {
         return;
     }
 
-    // Recursively delete all the kids
+    // recursively delete all children
     pid_node *child = processes[pid].children;
     while (child != NULL) {
         delete_process(child->pid, processes);
-        child = child -> next;
+        child = child->next;
     }
 
-    // Free the child list when kids are gone
-    free_child_list(processes[pid].children);
-    // Mark slot in main array empty
-    processes[pid].pid = -1;
+    // clean up process
+    free_child_list(processes[pid].children); // free children list
+    processes[pid].pid = -1; // mark as deleted
 }
 
 int main() {
     int max_processes;
 
+    // get max processes from user
     if (scanf("%d", &max_processes) != 1 || max_processes <= 0) {
-        // Exit if input is invalid
-        return 1;
+        return 1; // bad input
     }
 
-    // Eat the rest of the line so fgets doesnt break
+    // eat newline character left by scanf
     int temp_char;
     while ((temp_char = getchar()) != '\n' && temp_char != EOF);
 
-    // Allocate main array for PCBs
+    // make space for all processes
     pcb *processes = (pcb *)malloc(max_processes * sizeof(pcb));
-     // Exit if memory allocation fails
-    if (processes == NULL) return 1;
+    if (processes == NULL) return 1; // out of memory
 
-    // Set all pcb slots to empty
+    // mark all process slots as empty
     for (int i = 0; i < max_processes; i++) {
         processes[i].pid = -1;
         processes[i].children = NULL;
     }
 
-    // Create root process
+    // create process 0
     processes[0].pid = 0;
     processes[0].ppid = 0;
-    int next_pid = 1; // Next available PID starts at 1
+    int next_pid = 1; // next new process will be ID 1
 
     char command;
     int target_id;
-    // Buffer for one line of input
     char line_buffer[100];
     
-    // Read commands line by line with fgets
+    // main command loop
+    // runs until user types 'q'
     while (fgets(line_buffer, sizeof(line_buffer), stdin) != NULL) {
-        // Get the command from the buffer
+        // parse input line for command and ID
         int items_scanned = sscanf(line_buffer, " %c %d", &command, &target_id);
 
-        // Handle the 'q' quit command
+        // 'q' to quit
         if (items_scanned == 1 && command == 'q') {
             break;
         }
 
-        // If input is bad just skip it
+        // if input is bad skip to next line
         if (items_scanned != 2) {
             continue;
         }
 
+        // 'c' for create
         if (command == 'c') {
-            // Create if space and the parent exist
+            // check for space and does parent exist
             if (next_pid < max_processes && target_id >= 0 && target_id < max_processes && processes[target_id].pid != -1) {
-                // Setup the new pcb
+                // set up the new process's info
                 processes[next_pid].pid = next_pid;
                 processes[next_pid].ppid = target_id;
                 processes[next_pid].children = NULL;
 
-                // Make a new node for the parent's list
+                // add new process to parent's children list
                 pid_node *child_node = (pid_node *)malloc(sizeof(pid_node));
-                
-                // Check if malloc succeeded
                 if (child_node == NULL) {
                     free(processes);
-                    return 1;
+                    return 1; // out of memory
                 }
-
-                child_node -> pid = next_pid;
-                
-                // Add child to front of the list
-                child_node -> next = processes[target_id].children;
+                child_node->pid = next_pid;
+                // stick at the front of list
+                child_node->next = processes[target_id].children;
                 processes[target_id].children = child_node;
-                // Increment for next creation
-                next_pid++;
+
+                next_pid++; // get ready for next one
             }
+        // 'd' for delete
         } else if (command == 'd') {
+            // if target in valid range
             if (target_id >= 0 && target_id < max_processes) {
-                 delete_process(target_id, processes);
+                // kill process and family tree
+                delete_process(target_id, processes);
             }
         }
     }
 
-    // Print all active processes
+    // print what's left
     for (int i = 0; i < max_processes; i++) {
         if (processes[i].pid != -1) {
             printf("%d %d\n", processes[i].pid, processes[i].ppid);
         }
     }
 
-    // Free any child lists left
+    // free all memory used
     for (int i = 0; i < max_processes; i++) {
         if (processes[i].pid != -1) {
+            // free leftover children lists
             free_child_list(processes[i].children);
         }
     }
     
-    // Free the main array
+    // free main process array
     free(processes);
-
     return 0;
 }
