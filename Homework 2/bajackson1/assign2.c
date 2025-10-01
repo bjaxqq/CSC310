@@ -122,6 +122,11 @@ int main() {
                         // Store balance after the transaction for printing
                         final_balance = *balance;
 
+                        // Hold lock during transaction
+                        while (*clock < finish_time) {
+                            usleep(100);
+                        }
+
                         // Release access to shared balance
                         sem_post(sem);
 
