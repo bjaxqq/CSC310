@@ -79,9 +79,6 @@ int main() {
 
         // Increment transaction count for process
         shared_data[process_index].count++;
-
-        // Debug statement
-        printf("P:%d | Amount:%5d | Arrival:%3d | Stored. New Count: %d\n", proc_num, amount, arrival,shared_data[process_index].count);
     }
 
     // Fork child processes
