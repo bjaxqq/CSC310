@@ -104,7 +104,11 @@ int main() {
                 // Loop through process's transactions
                 for (int j = 0; j < shared_data[process_id].count; j++) {
                     // Check time and if transaction is not yet processed
-                    if (*clock == shared_data[process_id].arr[j].startTime && processed[j] == 0) {
+                    if (*clock >= shared_data[process_id].arr[j].startTime && processed[j] == 0) {
+                        
+                        // Request access to shared balance
+                        sem_wait(sem);
+                    
                         // Record start time
                         int actual_start_time = *clock;
                         
@@ -112,10 +116,8 @@ int main() {
                         int success = 0;
                         int final_balance = 0;
                         short current_amount = shared_data[process_id].arr[j].amount;
+                        short current_duration = shared_data[process_id].arr[j].duration;
 
-                        // Request access to shared balance
-                        sem_wait(sem);
-                    
                         // Check if transaction is possible
                         if (current_amount > 0 || (*balance + current_amount >= 0)) {
                             *balance += current_amount;
@@ -123,6 +125,9 @@ int main() {
                         }
                         // Store balance after the transaction for printing
                         final_balance = *balance;
+
+                        // Calculate when the transaction will finish
+                        int finish_time = actual_start_time + current_duration;
 
                         // Hold lock during transaction
                         while (*clock < finish_time) {
@@ -137,7 +142,7 @@ int main() {
                         printf("%d %d %d %d %d %d\n",
                                process_id + 1,
                                shared_data[process_id].arr[j].startTime,
-                               *clock, // The actual start time is the current clock tick
+                               actual_start_time,
                                success,
                                current_amount,
                                final_balance);
