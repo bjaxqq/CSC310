@@ -9,191 +9,186 @@
 #include <semaphore.h>
 #include <stdatomic.h>
 
-// Constants for the simulation
-#define MAX_CLOCK 150          // Max time for simulation to run, safely above 100
-#define CLOCK_SLEEP_USEC 10000 // 10ms per clock tick to slow down simulation
-#define CHILD_POLL_USEC 100    // Small sleep for children while waiting
+#define DURATION 150
+#define SLEEP_TIME 10000
+#define CHILD_POLL_USEC 100
 
-// Struct to hold data for a single transaction
+// Struct for a single transaction
 struct transaction {
-    short startTime; // Time in simulated clock ticks when transaction request received
-    short duration;  // Number of simulated clock ticks the transaction will take
-    short amount;    // Amount of transaction (negative for withdrawal)
+    short startTime;
+    short duration;
+    short amount;
 };
 
-// Struct to hold all transactions for a single process
+// Struct for a process's script of transactions
 struct procStruct {
-    short count;                  // Number of transactions in the for this process
-    struct transaction arr[1000]; // Array of transactions
+    short count;
+    struct transaction arr[1000];
 };
 
-// Create global pointers for shared memory variables
-atomic_int *clockTime;      // Shared simulation clock
-int *balance;               // Shared bank account balance
-sem_t *sem;                 // Shared semaphore for controlling access to balance
-struct procStruct *processes; // Shared array of process transaction data
+// Shared clock
+atomic_int *cT;
+// Shared bank balance
+int *balance;
+// Shared semaphore
+sem_t *sem;
+// Shared process data array
+struct procStruct *processes;
 
-// Function for the clock child process
+// Function for clock child process
 void timerChild() {
-    // Loop until the simulation duration is met
-    while (atomic_load(clockTime) < MAX_CLOCK) {
-        // Wait for a bit to define the speed of a clock tick
-        usleep(CLOCK_SLEEP_USEC);
-        // Increment the clock
-        atomic_fetch_add(clockTime, 1);
-    }
-    // Exit when the clock's job is done
-    exit(0);
+	// Loop until max simulation time
+	while (atomic_load(cT) < DURATION) {
+		// Wait for a bit
+		usleep(SLEEP_TIME);
+		// Tick the clock
+		atomic_fetch_add(cT, 1);
+	}
+
+	exit(0);
 }
 
-// Function for each worker child process
+// Function for worker child processes
 void procChild(int proc_index) {
-    // Get a pointer to this process's data and set its 1-based ID for printing
+    // Get this process's data and ID
     struct procStruct *my_proc_data = &processes[proc_index];
     int proc_id = proc_index + 1;
 
-    // Loop through all assigned transactions for this process
+    // Loop through transactions for this process
     for (int i = 0; i < my_proc_data->count; i++) {
         struct transaction current_tx = my_proc_data->arr[i];
+        int curTime = 0;
 
-        // Wait until the simulation clock reaches the transaction's arrival time
-        while (atomic_load(clockTime) < current_tx.startTime) {
+        // Poll clock until time for this transaction
+        do {
+            curTime = atomic_load(cT);
             usleep(CHILD_POLL_USEC);
-        }
+        } while (curTime < current_tx.startTime);
 
-        // Request the lock for the bank account
+        // Wait for lock
         sem_wait(sem);
 
-        // --- Critical Section Start ---
-
-        // Record the actual time the transaction begins after acquiring the lock
-        int actual_start_time = atomic_load(clockTime);
+        // Record start time after getting lock
+        int start_time = atomic_load(cT);
         int success_flag = 0;
         int final_balance;
 
-        // Check if a withdrawal would result in a negative balance
+        // Check if withdrawal is possible
         if (current_tx.amount < 0 && (*balance + current_tx.amount < 0)) {
-            // Mark transaction as failed
+            // Fail transaction
             success_flag = 0;
-            // Balance does not change
             final_balance = *balance;
         } else {
-            // Mark transaction as successful
+            // Succeed transaction and update balance
             success_flag = 1;
-            // Update the balance
             *balance += current_tx.amount;
-            // Record the new balance
             final_balance = *balance;
         }
 
-        // Calculate when the transaction will be complete
-        int completion_time = actual_start_time + current_tx.duration;
+        // Calculate when transaction will finish
+        int completion_time = start_time + current_tx.duration;
 
-        // Print the results for this transaction as specified in the README
+        // Print results on single line
         printf("%d %d %d %d %d %d\n",
-               proc_id,
-               current_tx.startTime,
-               completion_time,
-               success_flag,
-               current_tx.amount,
-               final_balance);
+               proc_id, current_tx.startTime, completion_time,
+               success_flag, current_tx.amount, final_balance);
         
-        // Ensure output is printed immediately
+        // Flush output buffer
         fflush(stdout);
 
-        // Hold the lock to simulate the transaction duration
-        while (atomic_load(clockTime) < completion_time) {
+        // Hold lock while processing transaction
+        while (atomic_load(cT) < completion_time) {
             usleep(CHILD_POLL_USEC);
         }
-
-        // Release the lock for the bank account
-        sem_post(sem);
         
-        // --- Critical Section End ---
+        // Return lock
+        sem_post(sem);
     }
 
-    // Exit when all transactions for this process are done
     exit(0);
 }
 
 int main() {
     int num_procs, num_trans;
 
-    // Read the total number of processes and transactions
+    // Read initial process and transaction counts
     scanf("%d %d", &num_procs, &num_trans);
 
-    // Set up shared memory for the clock using mmap
-    clockTime = (atomic_int *)mmap(NULL, sizeof(atomic_int), PROT_READ | PROT_WRITE,
+    // Create shared clock using mmap
+	cT = (atomic_int *)mmap(NULL, sizeof(atomic_int), PROT_READ | PROT_WRITE,
                                    MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-    // Set up shared memory for the bank balance
+	atomic_store(cT,0); // Initialize clock
+
+    // Create shared balance using mmap
     balance = (int *)mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE,
-                          MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-    // Set up shared memory for the semaphore
-    sem = (sem_t *)mmap(NULL, sizeof(sem_t), PROT_READ | PROT_WRITE,
-                        MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-    // Set up shared memory for the array of process data
+								MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    *balance = 0;
+
+    // Create shared semaphore using mmap
+	sem = (sem_t *)mmap(NULL, sizeof(sem_t), PROT_READ | PROT_WRITE,
+								MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+
+    // Create shared memory for all process data
     processes = (struct procStruct *)mmap(NULL, num_procs * sizeof(struct procStruct),
                                           PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
-    // Initialize shared variables to their starting values
-    atomic_store(clockTime, 0);
-    *balance = 0;
+    // Initialize semaphore
+    if (sem_init(sem, 1, 1) == -1) {
+        perror("sem_init failed");
+        exit(1);
+    };
 
-    // Initialize the transaction counts for each process to zero
+    // Set initial transaction counts to 0 for all processes
     for (int i = 0; i < num_procs; i++) {
         processes[i].count = 0;
     }
 
-    // Initialize the semaphore to be shared between processes, with an initial value of 1 (unlocked)
-    if (sem_init(sem, 1, 1) == -1) {
-        perror("sem_init failed");
-        exit(1);
-    }
-
-    // Loop to read all transaction data from input
+    // Read all transaction data from input
     for (int i = 0; i < num_trans; i++) {
         int arrival, proc_num, duration, amount;
         scanf("%d %d %d %d", &arrival, &proc_num, &duration, &amount);
-
-        // Adjust 1-based process number to 0-based index
+        
+        // Convert to 0-based index for array
         int proc_index = proc_num - 1;
-        // Find the next empty transaction slot for this process
         int trans_index = processes[proc_index].count;
-
-        // Store the transaction details in the correct process's array
+        
+        // Store the transaction data
         processes[proc_index].arr[trans_index].startTime = arrival;
         processes[proc_index].arr[trans_index].duration = duration;
         processes[proc_index].arr[trans_index].amount = amount;
-
-        // Increment the transaction count for that process
+        
+        // Increment the count of transactions for that process
         processes[proc_index].count++;
     }
 
-    // Fork the clock child process
-    if (fork() == 0) {
-        timerChild();
-    }
+    // Fork timer process
+	int pid = fork();
+	if (pid == 0)
+		timerChild();
 
-    // Fork a child process for each banking client
+    // Fork child processes
     for (int i = 0; i < num_procs; i++) {
-        if (fork() == 0) {
+        pid_t pid = fork();
+        if (pid == 0) {
+            // Child process runs
             procChild(i);
+        } else if (pid < 0) {
+            perror("fork failed");
+            exit(1);
         }
     }
-
-    // Wait for all children (clock + workers) to finish
+    
+    // Parent waits for all children
     for (int i = 0; i < num_procs + 1; i++) {
         wait(NULL);
     }
 
-    // Clean up the semaphore
-    sem_destroy(sem);
-
-    // Unmap and free all shared memory segments
-    munmap(clockTime, sizeof(atomic_int));
-    munmap(balance, sizeof(int));
-    munmap(sem, sizeof(sem_t));
-    munmap(processes, num_procs * sizeof(struct procStruct));
+	// Clean up the semaphore and shared memory
+	sem_destroy(sem);
+	munmap(cT, sizeof(atomic_int));
+	munmap(balance, sizeof(int));
+	munmap(sem, sizeof(sem_t));
+	munmap(processes, num_procs * sizeof(struct procStruct));
 
     return 0;
 }
