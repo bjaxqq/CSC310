@@ -137,6 +137,16 @@ int main() {
                         // Release access to shared balance
                         sem_post(sem);
 
+                        // Print the final output for this transaction
+                        // Format: proc_num arrival_time start_time success amount final_balance
+                        printf("%d %d %d %d %d %d\n",
+                               process_id + 1,
+                               shared_data[process_id].arr[j].startTime,
+                               actual_start_time,
+                               success,
+                               current_amount,
+                               final_balance);
+
                         // Mark transaction as processed
                         processed[j] = 1;
                     }
