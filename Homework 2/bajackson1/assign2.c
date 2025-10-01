@@ -81,7 +81,7 @@ int main() {
         shared_data[process_index].count++;
 
         // Debug statement
-        printf("Process: %d, New Count: %d\n", proc_num, shared_data[process_index].count);
+        printf("P:%d | Amount:%5d | Arrival:%3d | Stored. New Count: %d\n", proc_num, amount, arrival,shared_data[process_index].count);
     }
 
     return 0;
