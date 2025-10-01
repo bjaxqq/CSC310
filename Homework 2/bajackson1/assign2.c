@@ -105,6 +105,8 @@ int main() {
                 for (int j = 0; j < shared_data[process_id].count; j++) {
                     // Check time and if transaction is not yet processed
                     if (*clock == shared_data[process_id].arr[j].startTime && processed[j] == 0) {
+                        // Record start time
+                        int actual_start_time = *clock;
                         
                         // Local variables to store the result of this transaction
                         int success = 0;
