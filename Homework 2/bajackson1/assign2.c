@@ -6,6 +6,7 @@
 #include <sys/mman.h>
 #include <semaphore.h>
 #include <unistd.h>
+#include <sys/wait.h>
 
 struct transaction {
     short startTime; // Time in simulated clock ticks when transaction request received
@@ -23,7 +24,7 @@ int main() {
     int num_transactions;
     char line_buffer[100];
 
-    // Getting input for processes and transactions
+    // Get input for processes and transactions
     if (fgets(line_buffer, sizeof(line_buffer), stdin) != NULL) {
         if (sscanf(line_buffer, "%d %d", &num_processes, &num_transactions) != 2) {
             return 1; // Bad input
@@ -33,8 +34,7 @@ int main() {
     }
     
     // Create shared memory for process data
-    struct procStruct *shared_data = mmap(NULL, 
-                                          num_processes * sizeof(struct procStruct), 
+    struct procStruct *shared_data = mmap(NULL, num_processes * sizeof(struct procStruct), 
                                           PROT_READ | PROT_WRITE, 
                                           MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
@@ -83,6 +83,89 @@ int main() {
         // Debug statement
         printf("P:%d | Amount:%5d | Arrival:%3d | Stored. New Count: %d\n", proc_num, amount, arrival,shared_data[process_index].count);
     }
+
+    // Fork child processes
+    for (int i = 0; i < num_processes; i++) {
+        pid_t pid = fork();
+
+        if (pid < 0) {
+            perror("fork failed");
+            exit(1);
+        }
+
+        if (pid == 0) {
+            // Child process
+            int process_id = i; 
+            // Array to track completed transactions for this child
+            int processed[1000] = {0};
+
+            // Child process main loop
+            while (*clock < 100) {
+                // Loop through process's transactions
+                for (int j = 0; j < shared_data[process_id].count; j++) {
+                    // Check time and if transaction is not yet processed
+                    if (*clock == shared_data[process_id].arr[j].startTime && processed[j] == 0) {
+                        
+                        // Local variables to store the result of this transaction
+                        int success = 0;
+                        int final_balance = 0;
+                        short current_amount = shared_data[process_id].arr[j].amount;
+
+                        // Request access to shared balance
+                        sem_wait(sem);
+                    
+                        // Check if transaction is possible
+                        if (current_amount > 0 || (*balance + current_amount >= 0)) {
+                            *balance += current_amount;
+                            success = 1;
+                        }
+                        // Store balance after the transaction for printing
+                        final_balance = *balance;
+
+                        // Release access to shared balance
+                        sem_post(sem);
+
+                        // Print the final output for this transaction
+                        // Format: proc_num arrival_time start_time success amount final_balance
+                        printf("%d %d %d %d %d %d\n",
+                               process_id + 1,
+                               shared_data[process_id].arr[j].startTime,
+                               *clock, // The actual start time is the current clock tick
+                               success,
+                               current_amount,
+                               final_balance);
+
+                        // Mark transaction as processed
+                        processed[j] = 1;
+                    }
+                }
+                // Sleep for waiting
+                usleep(100);
+            }
+
+            // Exit after main loop is done
+            exit(0);
+        }
+    }
+
+    // Parent process as timekeeper
+    while (*clock < 100) {
+        // Simulate one tick of clock
+        usleep(10000);
+        (*clock)++;
+    }
+
+    // Wait for all child processes to finish
+    for (int i = 0; i < num_processes; i++) {
+        wait(NULL);
+    }
+
+    // Clean up shared memory and semaphore
+    sem_destroy(sem);
+    munmap(shared_data, num_processes * sizeof(struct procStruct));
+    munmap(balance, sizeof(int));
+    munmap(clock, sizeof(int));
+    munmap(sem, sizeof(sem_t));
 
     return 0;
 }
