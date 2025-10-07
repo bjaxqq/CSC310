@@ -1,5 +1,5 @@
 // assign2.c
-// Author: bajackson1@quinnipiac.edu
+// Author: bajackson1@quinniac.edu
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -46,90 +46,91 @@ void procChild(int process_id) {
     struct procStruct *my_process = &all_process_data[process_id];
     int total_transactions = my_process->count;
     int transactions_processed = 0;
-    int last_checked_tick = -1;
+    int next_transaction_idx = 0; // Index for the next transaction to check
 
-    // Loop while simulation runs and transactions remain
-    while (*simulated_clock <= DURATION && transactions_processed < total_transactions) {
-        // Check for work on new clock ticks
-        if (*simulated_clock > last_checked_tick) {
-            // Catch up on ticks missed during sleep
-            for (int tick_to_check = last_checked_tick + 1; tick_to_check <= *simulated_clock; tick_to_check++) {
-                // Find transaction scheduled for current tick
-                for (int i = 0; i < total_transactions; i++) {
-                    if (my_process->arr[i].startTime == tick_to_check) {
-                        struct transaction current_transaction = my_process->arr[i];
-                        int is_successful = 0;
-                        int balance_after_transaction = 0;
-                        
-                        // Request access to critical section
-                        sem_wait(balance_mutex);
+    // Loop until all of this process's transactions are handled
+    while (transactions_processed < total_transactions) {
+        // Check if it is time to process the next scheduled transaction
+        if (*simulated_clock >= my_process->arr[next_transaction_idx].startTime) {
+            struct transaction current_transaction = my_process->arr[next_transaction_idx];
+            int is_successful = 0;
+            int balance_after_transaction = 0;
+            int finish_tick = 0;
 
-                        // Find effective start time based on resource availability
-                        int effective_start_time = (current_transaction.startTime > *next_available_tick) ? current_transaction.startTime : *next_available_tick;
-                        
-                        // Find when resource will be free next
-                        int resource_busy_until = effective_start_time + current_transaction.duration;
+            // Request access to critical section
+            sem_wait(balance_mutex);
 
-                        // Set finish time as inclusive boundary
-                        int finish_tick = resource_busy_until - 1;
+            // Find effective start time based on resource availability
+            int effective_start_time = (current_transaction.startTime > *next_available_tick) ? current_transaction.startTime : *next_available_tick;
+            // Find when resource will be free next
+            int resource_busy_until = effective_start_time + current_transaction.duration;
+            // Set finish time as inclusive boundary
+            finish_tick = resource_busy_until - 1;
 
-                        // Update shared next available tick
-                        *next_available_tick = resource_busy_until;
+            // Update shared next available tick
+            *next_available_tick = resource_busy_until;
 
-                        if (current_transaction.amount > 0) { // Deposit
-                            *shared_account_balance += current_transaction.amount;
-                            is_successful = 1;
-                        } else { // Withdrawl
-                            if (*shared_account_balance >= -current_transaction.amount) { // Check for sufficient funds
-                                *shared_account_balance += current_transaction.amount; // Negative for withdrawals
-                                is_successful = 1;
-                            }
-                        }
-                        balance_after_transaction = *shared_account_balance;
-
-                        // Release access to critical section
-                        sem_post(balance_mutex);
-
-                        // Print transaction results
-                        printf("%d %d %d %d %d %d\n",
-                               current_transaction.startTime,
-                               process_id + 1, // process_id is 0-indexed, output is 1-indexed
-                               finish_tick,
-                               is_successful,
-                               current_transaction.amount,
-                               balance_after_transaction);
-                        fflush(stdout); // Flush stdout for immediate output
-
-                        transactions_processed++;
-                        break; // Found transaction, so break to next tick
-                    }
+            if (current_transaction.amount > 0) { // Deposit
+                *shared_account_balance += current_transaction.amount;
+                is_successful = 1;
+            } else { // Withdrawl
+                if (*shared_account_balance >= -current_transaction.amount) { // Check for sufficient funds
+                    *shared_account_balance += current_transaction.amount; // Negative for withdrawals
+                    is_successful = 1;
                 }
             }
-            last_checked_tick = *simulated_clock;
+            balance_after_transaction = *shared_account_balance;
+            
+            // Release access to critical section
+            sem_post(balance_mutex);
+
+            // Print transaction results
+            printf("%d %d %d %d %d %d\n",
+                   current_transaction.startTime,
+                   process_id + 1, // process_id is 0-indexed, output is 1-indexed
+                   finish_tick,
+                   is_successful,
+                   current_transaction.amount,
+                   balance_after_transaction);
+            fflush(stdout); // Flush stdout for immediate output
+
+            transactions_processed++;
+            next_transaction_idx++;
+        } else {
+             usleep(100); // Sleep to prevent busy-waiting
         }
-        usleep(100); // Sleep to prevent busy-waiting
     }
     exit(0);
 }
 
 int main() {
     int process_count, transaction_count;
+    // Read process and transaction counts
     scanf("%d %d", &process_count, &transaction_count);
 
     // Allocate shared memory for process data
     all_process_data = (struct procStruct *)mmap(NULL, process_count * sizeof(struct procStruct),
                                                  PROT_READ | PROT_WRITE,
                                                  MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    if (all_process_data == MAP_FAILED) { perror("mmap for process data failed"); exit(1); }
+
     // Allocate remaining shared memory regions
     simulated_clock = (int *)mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE,
                                    MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    if (simulated_clock == MAP_FAILED) { perror("mmap for clock failed"); exit(1); }
+
     shared_account_balance = (int *)mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE,
                                           MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    if (shared_account_balance == MAP_FAILED) { perror("mmap for balance failed"); exit(1); }
+
     balance_mutex = (sem_t *)mmap(NULL, sizeof(sem_t), PROT_READ | PROT_WRITE,
                                    MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-    // Allocate memory for next tick tracker
+    if (balance_mutex == MAP_FAILED) { perror("mmap for semaphore failed"); exit(1); }
+    
     next_available_tick = (int *)mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE,
                                       MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    if (next_available_tick == MAP_FAILED) { perror("mmap for next tick failed"); exit(1); }
+
 
     // Initialize transaction counts for each process
     for (int i = 0; i < process_count; i++) {
@@ -157,13 +158,17 @@ int main() {
     }
 
     // Fork child process for timer
-    if (fork() == 0) {
+    pid_t pid = fork();
+    if (pid < 0) { perror("fork for timer failed"); exit(1); }
+    if (pid == 0) {
         timerChild();
     }
 
     // Fork child process for each user
     for (int i = 0; i < process_count; i++) {
-        if (fork() == 0) {
+        pid = fork();
+        if (pid < 0) { perror("fork for process child failed"); exit(1); }
+        if (pid == 0) {
             procChild(i);
         }
     }
