@@ -38,6 +38,7 @@ void timerChild() {
         usleep(SLEEP_TIME);
         (*simulated_clock)++;
     }
+
     exit(0);
 }
 
@@ -79,8 +80,9 @@ void procChild(int process_id) {
                     is_successful = 1;
                 }
             }
+
             balance_after_transaction = *shared_account_balance;
-            
+
             // Release access to critical section
             sem_post(balance_mutex);
 
@@ -100,6 +102,7 @@ void procChild(int process_id) {
              usleep(100); // Sleep to prevent busy-waiting
         }
     }
+
     exit(0);
 }
 
@@ -126,7 +129,7 @@ int main() {
     balance_mutex = (sem_t *)mmap(NULL, sizeof(sem_t), PROT_READ | PROT_WRITE,
                                    MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     if (balance_mutex == MAP_FAILED) { perror("mmap for semaphore failed"); exit(1); }
-    
+
     next_available_tick = (int *)mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE,
                                       MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     if (next_available_tick == MAP_FAILED) { perror("mmap for next tick failed"); exit(1); }
@@ -159,7 +162,9 @@ int main() {
 
     // Fork child process for timer
     pid_t pid = fork();
+
     if (pid < 0) { perror("fork for timer failed"); exit(1); }
+
     if (pid == 0) {
         timerChild();
     }
@@ -167,7 +172,9 @@ int main() {
     // Fork child process for each user
     for (int i = 0; i < process_count; i++) {
         pid = fork();
+
         if (pid < 0) { perror("fork for process child failed"); exit(1); }
+
         if (pid == 0) {
             procChild(i);
         }

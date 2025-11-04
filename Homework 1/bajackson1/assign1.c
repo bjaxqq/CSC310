@@ -36,6 +36,7 @@ void delete_process(int pid, pcb *processes) {
 
     // Recursively delete all children
     pid_node *child = processes[pid].children;
+
     while (child != NULL) {
         delete_process(child->pid, processes);
         child = child->next;
@@ -56,10 +57,12 @@ int main() {
 
     // Eat newline character left by scanf
     int temp_char;
+
     while ((temp_char = getchar()) != '\n' && temp_char != EOF);
 
     // Make space for all processes
     pcb *processes = (pcb *)malloc(max_processes * sizeof(pcb));
+
     if (processes == NULL) return 1; // Out of memory
 
     // Mark all process slots as empty
@@ -76,7 +79,7 @@ int main() {
     char command;
     int target_id;
     char line_buffer[100];
-    
+
     // Main command loop
     // Runs until user types 'q'
     while (fgets(line_buffer, sizeof(line_buffer), stdin) != NULL) {
@@ -104,10 +107,12 @@ int main() {
 
                 // Add new process to parent's children list
                 pid_node *child_node = (pid_node *)malloc(sizeof(pid_node));
+
                 if (child_node == NULL) {
                     free(processes);
                     return 1; // Out of memory
                 }
+
                 child_node->pid = next_pid;
                 // Stick at the front of list
                 child_node->next = processes[target_id].children;
@@ -139,7 +144,7 @@ int main() {
             free_child_list(processes[i].children);
         }
     }
-    
+
     // Free main process array
     free(processes);
     return 0;

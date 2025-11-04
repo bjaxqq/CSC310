@@ -1,8 +1,10 @@
-# Makefile
-# Author: bajackson1@quinnipiac.edu
-
-assign2 : assign3.c
-	gcc -Wall -o assign3 assign3.c
+all: assign3
 
 clean:
-	rm -f assign3
+	rm -rf assign3 assign3.o
+
+assign3: assign3.c assign3.h
+	gcc -o assign3 assign3.c -Wall
+
+debug: assign3.c assign3.h
+	gcc -o assign3 -D DEBUG assign3.c -Wall
