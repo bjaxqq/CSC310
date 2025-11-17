@@ -33,82 +33,6 @@ char toChar(int bit) {
     return (bit ? '1' : '0');
 }
 
-// Free memory for fileInfo struct
-void freeFileInfo(fileInfo_t *fileInfo) {
-    free(fileInfo->filePath);
-    free(fileInfo->fileContents);
-}
-
-// Read file contents into fileInfo struct
-void readFile(const char *filePath, fileInfo_t *fileInfo) {
-    FILE *file;
-    long fileSize;
-
-    // Open input file
-    file = fopen(filePath, "r");
-
-    if (file == NULL) {
-        perror("Error opening input file");
-        exit(1);
-    }
-
-    // Get file size
-    fseek(file, 0, SEEK_END);
-    fileSize = ftell(file);
-    fseek(file, 0, SEEK_SET);
-
-    // Allocate memory for file path
-    fileInfo->filePath = (char *)malloc(strlen(filePath) + 1);
-
-    if (fileInfo->filePath == NULL) {
-        perror("malloc failed for filePath");
-        exit(1);
-    }
-
-    strcpy(fileInfo->filePath, filePath);
-
-    // Allocate memory for file contents
-    fileInfo->fileContents = (char *)malloc(fileSize + 1);
-
-    if (fileInfo->fileContents == NULL) {
-        perror("malloc failed for fileContents");
-        exit(1);
-    }
-
-    // Read file into contents buffer
-    if (fread(fileInfo->fileContents, 1, fileSize, file) != fileSize) {
-        fprintf(stderr, "Error reading file\n");
-        exit(1);
-    }
-
-    // Add null terminator
-    fileInfo->fileContents[fileSize] = '\0';
-    fileInfo->fileSize = fileSize;
-
-    fclose(file);
-}
-
-// Write file contents from struct to new file
-void writeFile(const char *filePath, fileInfo_t *fileInfo) {
-    FILE *file;
-
-    // Open output file
-    file = fopen(filePath, "w");
-
-    if (file == NULL) {
-        perror("Error opening output file");
-        exit(1);
-    }
-
-    // Write contents to file
-    if (fwrite(fileInfo->fileContents, 1, fileInfo->fileSize, file) != fileInfo->fileSize) {
-        fprintf(stderr, "Error writing to file\n");
-        exit(1);
-    }
-
-    fclose(file);
-}
-
 // Main function
 int main(int argc, char *argv[]) {
     fileInfo_t inputFile;
@@ -196,4 +120,80 @@ int main(int argc, char *argv[]) {
     freeFileInfo(&outputFile);
 
     return 0;
+}
+
+// Free memory for fileInfo struct
+void freeFileInfo(fileInfo_t *fileInfo) {
+    free(fileInfo->filePath);
+    free(fileInfo->fileContents);
+}
+
+// Read file contents into fileInfo struct
+void readFile(const char *filePath, fileInfo_t *fileInfo) {
+    FILE *file;
+    long fileSize;
+
+    // Open input file
+    file = fopen(filePath, "r");
+
+    if (file == NULL) {
+        perror("Error opening input file");
+        exit(1);
+    }
+
+    // Get file size
+    fseek(file, 0, SEEK_END);
+    fileSize = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+    // Allocate memory for file path
+    fileInfo->filePath = (char *)malloc(strlen(filePath) + 1);
+
+    if (fileInfo->filePath == NULL) {
+        perror("malloc failed for filePath");
+        exit(1);
+    }
+
+    strcpy(fileInfo->filePath, filePath);
+
+    // Allocate memory for file contents
+    fileInfo->fileContents = (char *)malloc(fileSize + 1);
+
+    if (fileInfo->fileContents == NULL) {
+        perror("malloc failed for fileContents");
+        exit(1);
+    }
+
+    // Read file into contents buffer
+    if (fread(fileInfo->fileContents, 1, fileSize, file) != fileSize) {
+        fprintf(stderr, "Error reading file\n");
+        exit(1);
+    }
+
+    // Add null terminator
+    fileInfo->fileContents[fileSize] = '\0';
+    fileInfo->fileSize = fileSize;
+
+    fclose(file);
+}
+
+// Write file contents from struct to new file
+void writeFile(const char *filePath, fileInfo_t *fileInfo) {
+    FILE *file;
+
+    // Open output file
+    file = fopen(filePath, "w");
+
+    if (file == NULL) {
+        perror("Error opening output file");
+        exit(1);
+    }
+
+    // Write contents to file
+    if (fwrite(fileInfo->fileContents, 1, fileInfo->fileSize, file) != fileInfo->fileSize) {
+        fprintf(stderr, "Error writing to file\n");
+        exit(1);
+    }
+
+    fclose(file);
 }
