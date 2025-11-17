@@ -6,4 +6,4 @@ Students are introduced to operating systems and the software to support these s
 
 ## Tools Used
 
-[COMING SOON]
+For this course we were taught how to use the C programming language for operating system programming, as well as how to use XUbuntu in VirtualBox/UTM for testing our code with `make` and `Valgrind`. I had previous experience with Linux and already had everything set up so I worked on my home desktop (and SSH'd in if in the classroom).
