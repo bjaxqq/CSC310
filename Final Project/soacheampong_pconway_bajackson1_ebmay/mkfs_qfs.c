@@ -93,15 +93,29 @@ int main(int argc, char *argv[]) {
 #endif
 
     // Calculate block size and counts (TODO: adjust these calculations as needed)
-    int total_data_available = (file_size - sizeof(superblock_t) - (sizeof(direntry_t) * 255));
-    sb.bytes_per_block = 512;
+    
+    // Subtract superblock and dir entries for available space
+    long total_data_available = (file_size - sizeof(superblock_t) - (sizeof(direntry_t) * 255));
+    
+    // Determine block size from disk image size
+    if (file_size <= 31457280) {
+        // <= 30MB (31457280 bytes) = 512 bytes per block
+        sb.bytes_per_block = 512;
+    } else if (file_size <= 62914560) {
+        // > 30MB and <= 60MB (62914560 bytes) = 1024 bytes per block
+        sb.bytes_per_block = 1024;
+    } else {
+        // > 60MB = 2048 bytes per block
+        sb.bytes_per_block = 2048;
+    }
 
 #ifdef DEBUG
-    fprintf(stderr, "Total data available: %d\n", total_data_available);
+    fprintf(stderr, "Total data available: %ld\n", total_data_available);
     fprintf(stderr, "Block size: %d\n", sb.bytes_per_block);
 #endif
 
-    sb.total_blocks = total_data_available / sb.bytes_per_block;
+    // Divide available data space by determined block size for total blocks
+    sb.total_blocks = (uint16_t) (total_data_available / sb.bytes_per_block);
 
 #ifdef DEBUG
     fprintf(stderr, "Total blocks: %d\n", sb.total_blocks);
