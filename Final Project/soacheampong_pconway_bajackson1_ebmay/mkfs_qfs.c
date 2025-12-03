@@ -91,8 +91,6 @@ int main(int argc, char *argv[]) {
 #ifdef DEBUG
     fprintf(stderr, "File size: %ld bytes\n", file_size);
 #endif
-
-    // Calculate block size and counts (TODO: adjust these calculations as needed)
     
     // Subtract superblock and dir entries for available space
     long total_data_available = (file_size - sizeof(superblock_t) - (sizeof(direntry_t) * 255));
